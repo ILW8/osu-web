@@ -24,8 +24,9 @@ class BeatmapSeeder extends Seeder
      * Run the database seeds.
      *
      * @return void
+     * @throws Exception
      */
-    public function run()
+    public function run(): void
     {
         if ($this->command) {
             $this->command->info('Seeding Beatmaps, this may take a while...');
@@ -43,70 +44,105 @@ class BeatmapSeeder extends Seeder
         }
         $api = '&k='.$api_key;
 
-        // get beatmaps
-        try {
-            $json = json_decode(file_get_contents($base_url.'get_beatmaps?since=2016-01-01%2000:00:00'.$api));
-        } catch (Exception $ex) {
-            if ($this->command) {
-                $this->command->error('Unable to fetch Beatmap data');
-                $this->command->error($ex->getMessage());
+        $seed_limit = (int)env('BM_SEED_LIMIT', 500);
+        $this->command->info("Seeding up to $seed_limit beatmaps");
+        $total_seeded = 0;
+        $since = '2007-01-01%2000:00:00';
+        $limit = '&limit=500';
 
-                return;
-            }
+        $progress = $this->command?->getOutput()->createProgressBar($seed_limit);
+        $progress->start();
+        $progress->setRedrawFrequency(1);
+        $progress->setFormat('debug');
+        while ($total_seeded < $seed_limit) {
+//            $this->command?->info("\nSending new API request with `since={$since}`");
+            // get beatmaps
+            try {
+                $json = json_decode(file_get_contents($base_url.'get_beatmaps?since='.$since.$api.$limit));
+            } catch (Exception $ex) {
+                if ($this->command) {
+                    $this->command->error('Unable to fetch Beatmap data');
+                    $this->command->error($ex->getMessage());
 
-            throw $ex;
-        }
-
-        $sets = $this->populateExisting($json);
-
-        foreach ($json as $item) {
-            $beatmapset = $this->beatmapsets[$item->beatmapset_id] ?? null;
-            $beatmap = $this->beatmaps[$item->beatmap_id] ?? null;
-
-            if ($beatmapset === null) {
-                $beatmapset = $this->createBeatmapset($item);
-
-                // technically shouldn't exist if new...
-                if (!array_key_exists($beatmapset->beatmapset_id, $sets)) {
-                    $sets[$beatmapset->beatmapset_id] = [];
+                    return;
                 }
-                $newBeatmapsetsCount++;
+
+                throw $ex;
             }
-            $this->beatmapsets[$beatmapset->beatmapset_id] = $beatmapset;
+//            $this->command?->info("Got response with ".count($json)." elements");
 
-            if ($beatmap === null) {
-                $beatmap = $this->createBeatmap($item);
 
-                // don't bother checking if it exists, just add it.
-                $sets[$beatmap->beatmapset_id][] = $beatmap->beatmap_id;
-                $newBeatmapsCount++;
+            $sets = $this->populateExisting($json);
+
+            foreach ($json as $item) {
+                $time_start = hrtime(true);
+                $beatmapset = $this->beatmapsets[$item->beatmapset_id] ?? null;
+                $beatmap = $this->beatmaps[$item->beatmap_id] ?? null;
+
+                if ($beatmapset === null) {
+                    $beatmapset = $this->createBeatmapset($item);
+
+                    // technically shouldn't exist if new...
+                    if (!array_key_exists($beatmapset->beatmapset_id, $sets)) {
+                        $sets[$beatmapset->beatmapset_id] = [];
+                    }
+                    $newBeatmapsetsCount++;
+                }
+                $this->beatmapsets[$beatmapset->beatmapset_id] = $beatmapset;
+                $time_bms = hrtime(true);
+
+
+                if ($beatmap === null) {
+                    $beatmap = $this->createBeatmap($item);
+
+                    // don't bother checking if it exists, just add it.
+                    $sets[$beatmap->beatmapset_id][] = $beatmap->beatmap_id;
+                    $newBeatmapsCount++;
+                }
+                $this->beatmaps[$beatmap->beatmap_id] = $beatmap;
+                $time_bm = hrtime(true);
+
+
+                $this->createFailtimes($beatmap);
+                $time_fail_times = hrtime(true);
+                $this->createDifficulty($beatmap);
+                $time_diff = hrtime(true);
+
+                $e_bms = str_pad(number_format(($time_bms - $time_start)/1_000_000, 3, '.', ' '), 7);
+                $e_bm = str_pad(number_format(($time_bm - $time_bms)/1_000_000, 3, '.', ' '), 7);
+                $e_ft = str_pad(number_format(($time_fail_times - $time_bm)/1_000_000, 3, '.', ' '), 7);
+                $e_diff = str_pad(number_format(($time_diff - $time_fail_times)/1_000_000, 3, '.', ' '), 7);
+//                $this->command?->info("bms: $e_bms ms | bm: $e_bm ms | ft: $e_ft ms | diff: $e_diff ms");
+
+//            $this->command?->info("Processed beatmap id $item->beatmap_id set id $item->beatmapset_id");
+                $progress->advance();
             }
-            $this->beatmaps[$beatmap->beatmap_id] = $beatmap;
 
-            $this->createFailtimes($beatmap);
-            $this->createDifficulty($beatmap);
+            foreach ($sets as $setId => $mapIds) {
+                $uniqueMapIds = array_unique($mapIds);
+                $setPlaycount = 0;
+                $names = [];
+                foreach ($uniqueMapIds as $mapId) {
+                    $beatmap = $this->beatmaps[$mapId];
+                    $setPlaycount += $beatmap->playcount;
+                    $names[] = $beatmap->version.'@'.$beatmap->playmode;
+                }
+
+                $beatmapset = $this->beatmapsets[$setId];
+                $beatmapset->versions_available = count($uniqueMapIds);
+                $beatmapset->play_count = $setPlaycount;
+                $beatmapset->difficulty_names = implode(',', $names);
+                $beatmapset->save();
+            }
+
+
+            $total_seeded += count($json);
+            $since = str_replace(' ', '%20', end($json)->approved_date);
         }
-
-        foreach ($sets as $setId => $mapIds) {
-            $uniqueMapIds = array_unique($mapIds);
-            $setPlaycount = 0;
-            $names = [];
-            foreach ($uniqueMapIds as $mapId) {
-                $beatmap = $this->beatmaps[$mapId];
-                $setPlaycount += $beatmap->playcount;
-                $names[] = $beatmap->version.'@'.$beatmap->playmode;
-            }
-
-            $beatmapset = $this->beatmapsets[$setId];
-            $beatmapset->versions_available = count($uniqueMapIds);
-            $beatmapset->play_count = $setPlaycount;
-            $beatmapset->difficulty_names = implode(',', $names);
-            $beatmapset->save();
-        }
+        $progress->finish();
 
         $updatedBeatmapsetsCount = count($this->beatmapsets) - $newBeatmapsetsCount;
         $updatedBeatmapsCount = count($this->beatmaps) - $newBeatmapsCount;
-
         if ($this->command) {
             $this->command->info("Beatmap Sets: {$updatedBeatmapsetsCount} updated, {$newBeatmapsetsCount} new.");
             $this->command->info("Beatmaps: {$updatedBeatmapsCount} updated, {$newBeatmapsCount} new.");
@@ -190,6 +226,7 @@ class BeatmapSeeder extends Seeder
             $modes = array_values(Beatmap::MODES);
         }
 
+        $data = [];
         foreach ($modes as $mode) {
             // fuzz the ratings for converts a little.
             // TODO: should probably update the endpoint the seeder uses to
@@ -202,13 +239,20 @@ class BeatmapSeeder extends Seeder
                 $diff_unified = rand(1, 10000) / 10000;
             }
 
-            BeatmapDifficulty::create([
+            $data[] = [
                 'beatmap_id' => $beatmap->beatmap_id,
                 'mode' => $mode,
                 'mods' => 0,
                 'diff_unified' => $diff_unified,
-            ]);
+            ];
+
         }
+
+        $timestamp = Carbon::now();
+        foreach ($data as &$record) {
+            $record['last_update'] = $timestamp;
+        }
+        BeatmapDifficulty::insert($data);
     }
 
     private function populateExisting(array $beatmaps)
@@ -228,13 +272,11 @@ class BeatmapSeeder extends Seeder
         $beatmapsetIds = array_keys($sets);
         $beatmapIds = array_flatten(array_values($sets));
 
-        $this->beatmapsets = [];
         $beatmapsets = Beatmapset::withoutGlobalScopes()->whereIn('beatmapset_id', $beatmapsetIds)->get();
         foreach ($beatmapsets as $beatmapset) {
             $this->beatmapsets[$beatmapset->beatmapset_id] = $beatmapset;
         }
 
-        $this->beatmaps = [];
         $beatmaps = Beatmap::withoutGlobalScopes()->whereIn('beatmap_id', $beatmapIds)->get();
         foreach ($beatmaps as $beatmap) {
             $this->beatmaps[$beatmap->beatmap_id] = $beatmap;
