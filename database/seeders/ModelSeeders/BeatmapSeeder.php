@@ -11,6 +11,7 @@ use App\Models\BeatmapFailtimes;
 use App\Models\Beatmapset;
 use App\Models\User;
 use Carbon\Carbon;
+use DateTimeImmutable;
 use Exception;
 use Illuminate\Database\Seeder;
 
@@ -44,18 +45,23 @@ class BeatmapSeeder extends Seeder
         }
         $api = '&k='.$api_key;
 
-        $seed_limit = (int)env('BM_SEED_LIMIT', 500);
-        $this->command->info("Seeding up to $seed_limit beatmaps");
-        $total_seeded = 0;
+        $seed_limit_str = env('BM_SEED_END_DATE', '2008-01-01%2000:00:00');
+        $seed_limit_dt = DateTimeImmutable::createFromFormat("Y-m-d G:i:s", str_replace("%20", " ", $seed_limit_str));
+        if (!$seed_limit_dt) {
+            $this->command?->error("Could not parse '$seed_limit_str' as a valid date");
+
+            return;
+        }
+        $this->command?->info("Seeding beatmaps until ".str_replace("%20", " ", $seed_limit_str));
+        $last_seeded = new DateTimeImmutable("@0");
         $since = '2007-01-01%2000:00:00';
         $limit = '&limit=500';
 
-        $progress = $this->command?->getOutput()->createProgressBar($seed_limit);
+        $progress = $this->command?->getOutput()->createProgressBar();
         $progress->start();
         $progress->setRedrawFrequency(1);
         $progress->setFormat('debug');
-        while ($total_seeded < $seed_limit) {
-//            $this->command?->info("\nSending new API request with `since={$since}`");
+        while ($last_seeded < $seed_limit_dt) {
             // get beatmaps
             try {
                 $json = json_decode(file_get_contents($base_url.'get_beatmaps?since='.$since.$api.$limit));
@@ -69,13 +75,11 @@ class BeatmapSeeder extends Seeder
 
                 throw $ex;
             }
-//            $this->command?->info("Got response with ".count($json)." elements");
 
 
             $sets = $this->populateExisting($json);
 
             foreach ($json as $item) {
-                $time_start = hrtime(true);
                 $beatmapset = $this->beatmapsets[$item->beatmapset_id] ?? null;
                 $beatmap = $this->beatmaps[$item->beatmap_id] ?? null;
 
@@ -89,8 +93,6 @@ class BeatmapSeeder extends Seeder
                     $newBeatmapsetsCount++;
                 }
                 $this->beatmapsets[$beatmapset->beatmapset_id] = $beatmapset;
-                $time_bms = hrtime(true);
-
 
                 if ($beatmap === null) {
                     $beatmap = $this->createBeatmap($item);
@@ -100,21 +102,10 @@ class BeatmapSeeder extends Seeder
                     $newBeatmapsCount++;
                 }
                 $this->beatmaps[$beatmap->beatmap_id] = $beatmap;
-                $time_bm = hrtime(true);
-
 
                 $this->createFailtimes($beatmap);
-                $time_fail_times = hrtime(true);
                 $this->createDifficulty($beatmap);
-                $time_diff = hrtime(true);
 
-                $e_bms = str_pad(number_format(($time_bms - $time_start)/1_000_000, 3, '.', ' '), 7);
-                $e_bm = str_pad(number_format(($time_bm - $time_bms)/1_000_000, 3, '.', ' '), 7);
-                $e_ft = str_pad(number_format(($time_fail_times - $time_bm)/1_000_000, 3, '.', ' '), 7);
-                $e_diff = str_pad(number_format(($time_diff - $time_fail_times)/1_000_000, 3, '.', ' '), 7);
-//                $this->command?->info("bms: $e_bms ms | bm: $e_bm ms | ft: $e_ft ms | diff: $e_diff ms");
-
-//            $this->command?->info("Processed beatmap id $item->beatmap_id set id $item->beatmapset_id");
                 $progress->advance();
             }
 
@@ -136,10 +127,12 @@ class BeatmapSeeder extends Seeder
             }
 
 
-            $total_seeded += count($json);
             $since = str_replace(' ', '%20', end($json)->approved_date);
+            $last_seeded = DateTimeImmutable::createFromFormat("Y-m-d G:i:s", end($json)->approved_date);
+            $this->command?->info("\nProcessed up to " . end($json)->approved_date);
         }
         $progress->finish();
+        $this->command?->info("");
 
         $updatedBeatmapsetsCount = count($this->beatmapsets) - $newBeatmapsetsCount;
         $updatedBeatmapsCount = count($this->beatmaps) - $newBeatmapsCount;
