@@ -149,7 +149,7 @@ class BeatmapSeeder extends Seeder
         return Beatmap::create([
             'beatmap_id' => $json->beatmap_id,
             'beatmapset_id' => $json->beatmapset_id,
-            'filename' => "{$json->artist} - {$json->title} ({$user->username}) [{$json->version}].osu",
+            'filename' => "{$json->artist} - {$json->title} (727) [{$json->version}].osu",
             'checksum' => $json->file_md5,
             'version' => $json->version,
             'total_length' => $json->total_length,
