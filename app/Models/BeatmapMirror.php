@@ -6,6 +6,7 @@
 namespace App\Models;
 
 use Auth;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @property string $base_url
@@ -48,7 +49,10 @@ class BeatmapMirror extends Model
 
     public static function getRandom()
     {
-        return self::where('regions', null)->randomUsable()->first();
+        $mirror = self::where('regions', null)->randomUsable()->first();
+        Log::critical("getting random mirror: $mirror");
+
+        return $mirror;
     }
 
     public static function getRandomFromList(array $mirrorIds)
@@ -84,7 +88,9 @@ class BeatmapMirror extends Model
         $userId = Auth::check() ? Auth::user()->user_id : 0;
         $checksum = md5("{$beatmapset->beatmapset_id}{$diskFilename}{$serveFilename}{$time}{$noVideo}{$this->secret_key}");
 
-        $url = "{$this->base_url}d/{$beatmapset->beatmapset_id}?fs=".rawurlencode($serveFilename).'&fd='.rawurlencode($diskFilename)."&ts=$time&cs=$checksum&nv=$noVideo";
+        # https://api.chimu.moe/v1/download/1992471?n=1
+//        $url = "{$this->base_url}d/{$beatmapset->beatmapset_id}?fs=".rawurlencode($serveFilename).'&fd='.rawurlencode($diskFilename)."&ts=$time&cs=$checksum&nv=$noVideo";
+        $url = "https://api.chimu.moe/v1/download/{$beatmapset->beatmapset_id}?n=1";
 
         return $url;
     }

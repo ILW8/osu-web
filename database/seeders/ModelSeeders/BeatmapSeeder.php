@@ -54,7 +54,7 @@ class BeatmapSeeder extends Seeder
         }
         $this->command?->info("Seeding beatmaps until ".str_replace("%20", " ", $seed_limit_str));
         $last_seeded = new DateTimeImmutable("@0");
-        $since = '2007-01-01%2000:00:00';
+        $since = '2018-03-08%2016:40:03';
         $limit = '&limit=500';
 
         $progress = $this->command?->getOutput()->createProgressBar();
@@ -122,7 +122,7 @@ class BeatmapSeeder extends Seeder
                 $beatmapset = $this->beatmapsets[$setId];
                 $beatmapset->versions_available = count($uniqueMapIds);
                 $beatmapset->play_count = $setPlaycount;
-                $beatmapset->difficulty_names = implode(',', $names);
+//                $beatmapset->difficulty_names = implode(',', $names);
                 $beatmapset->save();
             }
 
@@ -146,10 +146,16 @@ class BeatmapSeeder extends Seeder
     {
         $user = $this->randomUser();
 
+        $artist = $json->artist;
+        $filename = "{$json->artist} - {$json->title} ({$user->username}) [{$json->version}].osu";
+        if (strlen($filename) >= 150) {
+            $filename = "Artists - {$json->title} ({$user->username}) [{$json->version}].osu";
+        }
+
         return Beatmap::create([
             'beatmap_id' => $json->beatmap_id,
             'beatmapset_id' => $json->beatmapset_id,
-            'filename' => "{$json->artist} - {$json->title} (727) [{$json->version}].osu",
+            'filename' => $filename,
             'checksum' => $json->file_md5,
             'version' => $json->version,
             'total_length' => $json->total_length,
@@ -187,7 +193,7 @@ class BeatmapSeeder extends Seeder
             'genre_id' => $json->genre_id,
             'language_id' => $json->language_id,
             'versions_available' => 1,
-            'difficulty_names' => '',
+            'difficulty_names' => null,
             'play_count' => 0,
             'favourite_count' => $json->favourite_count,
             'user_id' => $this->randomUser()->getKey(),
