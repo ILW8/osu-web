@@ -428,7 +428,7 @@ class Beatmapset extends Model implements AfterCommit, Commentable, Indexable, T
     {
         $timestamp = $customTimestamp ?? $this->defaultCoverTimestamp();
 
-        return StorageUrl::make(null, $this->coverPath()."{$coverSize}.jpg?{$timestamp}");
+        return StorageUrl::make('upstream-assets', $this->coverPath()."{$coverSize}.jpg?{$timestamp}");
     }
 
     public function coverPath()
