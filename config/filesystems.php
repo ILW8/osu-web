@@ -74,6 +74,10 @@ return [
             'base_url' => env('APP_URL', 'http://localhost').'/uploads',
         ],
 
+        'upstream-assets' => [
+            'base_url' => 'https://assets.ppy.sh',
+        ],
+
         'local-avatar' => [
             'driver' => 'local',
             'root' => public_path().'/uploads-avatar',
