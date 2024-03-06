@@ -48,7 +48,6 @@
     "xsolla/xsolla-sdk-php": "dev-php81"
   },
   "require-dev": {
-    "barryvdh/laravel-ide-helper": "^3.0",
     "beyondcode/laravel-query-detector": "*",
     "dealerdirect/phpcodesniffer-composer-installer": "^0.7.0",
     "dms/phpunit-arraysubset-asserts": "^0.3.0",
