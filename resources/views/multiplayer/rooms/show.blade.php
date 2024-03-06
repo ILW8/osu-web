@@ -80,6 +80,10 @@
     @include('multiplayer.rooms._rankings_table', compact('scores'))
 @endsection
 
+{{--@section('somethingmaybe')--}}
+{{--    @include('multiplayer.rooms._games', compact('playlistitems', 'scores'))--}}
+{{--@endsection--}}
+
 @section('ranking-footer')
-    @include('rankings._beatmapsets', compact('beatmapsets'))
+    @include('rankings._beatmapsets', compact('beatmaps', 'beatmapsets', 'scores', 'playlistitems'))
 @endsection

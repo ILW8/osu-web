@@ -68,6 +68,8 @@
                 @yield('scores')
             </div>
 
+{{--            @yield('somethingmaybe')--}}
+
             @yield('ranking-footer')
 
             @if ($hasPager)

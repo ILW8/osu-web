@@ -627,6 +627,7 @@ class Room extends Model
     public function topScores()
     {
         return $this->userHighScores()->forRanking()->with('user.country');
+//        return $this->hasMany(PlaylistItemUserHighScore::class)->with('user.country');
     }
 
     private function assertHostRoomAllowance()
