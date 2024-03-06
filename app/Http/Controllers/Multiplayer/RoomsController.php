@@ -9,8 +9,6 @@ use App\Exceptions\InvariantException;
 use App\Http\Controllers\Controller as BaseController;
 use App\Models\Multiplayer\Room;
 use App\Transformers\Multiplayer\RoomTransformer;
-use Illuminate\Support\Facades\Log;
-
 
 class RoomsController extends BaseController
 {
@@ -174,14 +172,10 @@ class RoomsController extends BaseController
         if ($room->isRealtime()) {
             $playlistItemsQuery->whereHas('scoreLinks');
         }
-        $playlistItems = $playlistItemsQuery->with('beatmap.beatmapset.beatmaps')->get();
-        $playlistItemsSlim = $playlistItems->map->only('id', 'room_id', 'beatmap');
-        Log::debug($playlistItemsSlim);
+        $playlistItems = $playlistItemsQuery->with(['beatmap.beatmapset.beatmaps', 'highScores', 'highScores.user'])->get();
         $beatmaps = $playlistItems->pluck('beatmap');
         $beatmapsets = $beatmaps->pluck('beatmapset');
         $highScores = $room->topScores()->paginate(50);
-//        Log::debug('jhafhjkgadshjasdklasd');
-//        Log::debug($highScores);
         $spotlightRooms = Room::featured()->orderBy('id', 'DESC')->get();
 
         return ext_view('multiplayer.rooms.show', [

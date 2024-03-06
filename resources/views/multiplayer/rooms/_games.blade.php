@@ -3,22 +3,6 @@
     See the LICENCE file in the repository root for full licence text.
 --}}
 
-{{--todo: rename. this is a misnomer!!!!!!--}}
-{{--<div class="rankings-games">--}}
-{{--    <div class="osu-layout__col-container osu-layout__col-container--with-gutter">--}}
-{{--        @foreach ($playlistitems as $item)--}}
-{{--            <div class="osu-layout__col osu-layout__col--sm-6">--}}
-{{--                <div--}}
-{{--                    class="727"--}}
-{{--                    data-beatmapset-panel="{{ json_encode(['playlistitem' => json_item($item, 'Multiplayer\PlaylistItem')]) }}"--}}
-{{--                >--}}
-{{--                    72727272727272727--}}
-{{--                </div>--}}
-{{--            </div>--}}
-{{--        @endforeach--}}
-{{--    </div>--}}
-{{--</div>--}}
-
 <table class="ranking-page-table">
     <thead>
     <tr>
@@ -29,16 +13,14 @@
         <th class="ranking-page-table__heading">
             {{ osu_trans('rankings.stat.accuracy') }}
         </th>
-{{--        <th class="ranking-page-table__heading">--}}
-{{--            {{ osu_trans('rankings.stat.play_count') }}--}}
-{{--        </th>--}}
         <th class="ranking-page-table__heading ranking-page-table__heading--focused">
             {{ osu_trans('rankings.type.score') }}
         </th>
     </tr>
     </thead>
     <tbody>
-    @foreach ($filtered_scores as $index => $score)
+
+    @foreach ($playlistitem->highScores as $index => $score)
         <tr class="ranking-page-table__row{{$score->user->isActive() ? '' : ' ranking-page-table__row--inactive'}}">
             <td class="ranking-page-table__column ranking-page-table__column--rank">
                 #{{ $scores->firstItem() + $index }}
@@ -61,13 +43,10 @@
                 </div>
             </td>
             <td class="ranking-page-table__column ranking-page-table__column--dimmed">
-                {{ format_percentage($score->averageAccuracy() * 100) }}
+                {{ format_percentage($score->accuracy * 100) }}
             </td>
-{{--            <td class="ranking-page-table__column ranking-page-table__column--dimmed">--}}
-{{--                {{ i18n_number_format($score->attempts) }}--}}
-{{--            </td>--}}
             <td class="ranking-page-table__column ranking-page-table__column--focused">
-                {!! suffixed_number_format_tag($score->total_score) !!}
+                <span>{{i18n_number_format($score->total_score)}}</span>
             </td>
         </tr>
     @endforeach
